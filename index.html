@@ -1,0 +1,1320 @@
+<script>
+const ACCESS_CODE = "20260224"; // 你设一个
+
+const input = prompt("请输入访问口令");
+if (input !== ACCESS_CODE) {
+  document.body.innerHTML = "<h2 style='color:white;text-align:center;margin-top:40vh;'>无权访问</h2>";
+}
+</script>
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Happy Birthday - Starry Glow Edition</title>
+    <!-- 引入优雅字体 -->
+    <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Noto+Sans+SC:wght@300;500&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/gsap.min.js"></script>
+    
+    <!-- MediaPipe Hands CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+
+    <style>
+        :root {
+            --primary-glow: #ff66cc;
+            --secondary-glow: #cc66ff;
+            --text-color: #ffd6f0;
+            --holographic: linear-gradient(135deg, rgba(255,111,174,0.4) 0%, rgba(207,168,255,0.4) 50%, rgba(112,214,255,0.4) 100%);
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000;
+            font-family: 'Noto Sans SC', sans-serif;
+            color: var(--text-color);
+        }
+
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        #input-video {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 1px;
+            height: 1px;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #header-area {
+            position: fixed;
+            top: 6vh;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            z-index: 100;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+
+        h1 {
+            font-family: 'Great Vibes', cursive;
+            font-size: clamp(3rem, 10vw, 6rem);
+            margin: 0;
+            opacity: 0;
+            text-shadow: 0 0 15px var(--primary-glow), 0 0 30px var(--secondary-glow);
+            transition: opacity 2s ease;
+        }
+
+        .sub-text-right {
+            position: absolute;
+            right: 10%;
+            top: 60%;
+            font-size: 0.8rem;
+            letter-spacing: 4px;
+            opacity: 0.4;
+            text-transform: uppercase;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+        }
+
+        .interactive { pointer-events: auto; }
+
+        .btn-magic {
+            background: rgba(255, 102, 204, 0.15);
+            border: 1px solid var(--primary-glow);
+            color: var(--text-color);
+            padding: 12px 35px;
+            font-size: 1.1rem;
+            border-radius: 50px;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            box-shadow: 0 0 20px rgba(255, 102, 204, 0.2);
+            margin-top: 20px;
+        }
+
+        .btn-magic:hover {
+            background: rgba(255, 102, 204, 0.4);
+            box-shadow: 0 0 35px var(--primary-glow);
+            transform: scale(1.05);
+        }
+
+        #blow-meter {
+            width: 200px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            margin-top: 300px;
+            display: none;
+            overflow: hidden;
+        }
+        #blow-fill {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, var(--secondary-glow), var(--primary-glow));
+            box-shadow: 0 0 10px var(--primary-glow);
+        }
+
+        #countdown {
+            font-size: 8rem;
+            font-weight: bold;
+            display: none;
+            color: var(--text-color);
+            text-shadow: 0 0 40px var(--primary-glow);
+            z-index: 200;
+        }
+
+        /* 全息贺卡主体 */
+        #holographic-card {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 360px;
+            min-height: 460px;
+            background: var(--holographic);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 30px;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 30px;
+            box-shadow: 0 20px 80px rgba(0,0,0,0.8);
+            z-index: 1000;
+            text-align: center;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #holographic-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 30px;
+            padding: 2px;
+            background: linear-gradient(45deg, transparent, rgba(255,255,255,0.6), transparent);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask-composite: exclude;
+            pointer-events: none;
+        }
+
+        .card-to { font-size: 1.2rem; margin-bottom: 20px; opacity: 0.8; letter-spacing: 2px; }
+        .card-wish { font-size: 1rem; line-height: 1.8; margin: 15px 0; font-weight: 300; }
+        .card-from { margin-top: auto; font-size: 0.85rem; opacity: 0.6; }
+
+        #gallery-hint {
+            position: fixed;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.85rem;
+            letter-spacing: 2px;
+            opacity: 0;
+            z-index: 100;
+            pointer-events: none;
+            background: rgba(0,0,0,0.5);
+            padding: 8px 24px;
+            border-radius: 20px;
+            backdrop-filter: blur(5px);
+            transition: opacity 0.5s;
+        }
+
+        /* 重新打开贺卡的按钮 */
+        #show-card-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            z-index: 1100;
+            display: none;
+            background: rgba(255, 102, 204, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 50px;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            font-size: 0.9rem;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        #show-card-btn:hover {
+            background: rgba(255, 102, 204, 0.4);
+            transform: translateY(-3px);
+        }
+
+        .close-card {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            cursor: pointer;
+            width: 30px;
+            height: 30px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+    <video id="input-video" playsinline></video>
+
+    <div id="header-area">
+        <h1 id="title">Happy Birthday</h1>
+        <div class="sub-text-right">Best Wishes For You</div>
+    </div>
+
+    <div id="ui-layer">
+        <div id="intro-screen">
+            <button class="btn-magic interactive" style="margin-top: 320px;" onclick="startSequence()">开启这份星光礼物</button>
+        </div>
+        <div id="countdown"></div>
+        <div id="interaction-ui">
+            <div id="blow-meter"><div id="blow-fill"></div></div>
+            <div id="status-msg" class="status-text" style="margin-top:15px; font-size:0.9rem; opacity:0.7;"></div>
+            <button id="skip-btn" class="btn-magic interactive" style="display:none; font-size: 0.85rem; margin-top: 40px;" onclick="forceBlowDone()">✨ 让星光替你完成这一刻</button>
+        </div>
+        <div id="gallery-hint">挥手旋转星球，捏合放大照片</div>
+    </div>
+
+    <div id="holographic-card" class="interactive">
+        <div class="close-card" onclick="hideCardOverlay()">✕</div>
+        <div class="card-to" id="card-to">To: 亲爱的你</div>
+        <div class="card-wish" id="card-wish"></div>
+        <div class="card-from">From: 梦皎<br><span id="current-date"></span></div>
+        <button class="btn-magic" style="margin-top: 25px; font-size: 0.8rem; padding: 8px 20px;" onclick="restartPage()">重新播放</button>
+    </div>
+
+    <button id="show-card-btn" class="interactive" onclick="showCardOverlay()">查看贺卡 ✨</button>
+
+<input id="photo-input" type="file" accept="image/*" multiple style="display:none">
+
+    <script>
+        const config = {
+            recipientName: "亲爱的你",
+            messageLines: [
+		"上天垂光兮予以青春，今日何日兮共此良辰。",
+                "愿你此后路途，总有星辰指引。",
+                "每一刻期待都能如期而至，",
+                "每一份努力都能被岁月厚待。",
+                "年年岁岁，平安喜乐！"
+            ],
+            photoList: [],
+            blowHoldSeconds: 2.0,
+            blowThreshold: 0.12,
+            particleQuality: "high",
+            theme: {
+                background: "#000000",
+                rosePink: "#FF6FAE",
+                lavender: "#CFA8FF"
+            },
+            gesture: {
+                swipeSensitivity: 1.2, 
+                pinchThreshold: 0.4,
+                kFrames: 5,           
+                cooldown: 650         
+            }
+        };
+
+        const State = {
+            INTRO: 'INTRO',
+            COUNTDOWN: 'COUNTDOWN',
+            CAKE_REVEAL: 'CAKE_REVEAL',
+            BLOW: 'BLOW',
+            EXTINGUISH: 'EXTINGUISH',
+            GIFT: 'GIFT',
+            CARD_PHOTOS: 'CARD_PHOTOS'
+        };
+
+        let currentState = State.INTRO;
+        let scene, camera, renderer, clock;
+        let starField, cakeGroup, giftBox;
+        let galleryGroup, photoCards = [], sphereParticles;
+        let candles = [], flames = [];
+        let analyser, dataArray, audioContext;
+        let blowProgress = 0;
+        let currentPhotoIndex = 0;
+        let targetRotation = 0;
+        let isDragging = false, startX = 0;
+        let autoRotate = true, lastInteractTime = 0;
+        let isCardExpanded = false;
+
+        let wristHistory = [];
+        let gestureCooldown = 0;
+        let smoothPinchDist = 1.0;
+        let isPinching = false;
+        let fistCounter = 0, palmCounter = 0;
+        // ===== 手势交互增强：新增全局状态（只影响手势部分） =====
+        let lastWristX = 0;               // 你代码里用到了但没定义
+        let smoothedDx = 0;               // 平滑旋转
+	let selectedCard = null;          // 当前被捏合选中的照片卡片
+	let selectedHome = null;          // 选中前的位置/缩放
+	let pinchHold = 0;                // 捏合稳定帧数
+	let palmHold = 0;                 // 张开手掌稳定帧数
+	let fistHold = 0;                 // 合拢手势稳定帧数
+	let isPalmZoomed = false;         // 是否处于“张开手掌放大态”
+	const raycasterHand = new THREE.Raycaster();
+	const ndcHand = new THREE.Vector2();
+
+        let mpHands, mpCamera;
+
+        function initThree() {
+            if (scene) return;
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(config.theme.background);
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 1.8, 6.5);
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+            clock = new THREE.Clock();
+            createStarField();
+	const amb = new THREE.AmbientLight(0xffffff, 0.9);
+	scene.add(amb);
+	const dir = new THREE.DirectionalLight(0xffffff, 0.9);
+	dir.position.set(2, 4, 6);
+	scene.add(dir);
+            initInteractionListeners();
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function createStarField() {
+            const count = 8000;
+            const geo = new THREE.BufferGeometry();
+            const pos = new Float32Array(count * 3);
+            const cols = new Float32Array(count * 3);
+            for(let i=0; i<count; i++) {
+                pos[i*3] = (Math.random()-0.5)*30;
+                pos[i*3+1] = (Math.random()-0.5)*30;
+                pos[i*3+2] = (Math.random()-0.5)*30;
+                const c = new THREE.Color(Math.random()>0.5?config.theme.rosePink:config.theme.lavender);
+                cols[i*3]=c.r; cols[i*3+1]=c.g; cols[i*3+2]=c.b;
+            }
+            geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+            geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+            starField = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.04, vertexColors: true, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending }));
+            scene.add(starField);
+        }
+
+// ===== 本地照片加载：对方选择后才显示（不上传、不出网）=====
+let localPhotoObjectURLs = [];
+
+function revokeLocalPhotoURLs() {
+  localPhotoObjectURLs.forEach(u => URL.revokeObjectURL(u));
+  localPhotoObjectURLs = [];
+}
+
+// 清理旧相册（避免重复创建/内存泄漏）
+function disposeGallery() {
+  if (!galleryGroup) return;
+
+  galleryGroup.traverse((obj) => {
+    if (obj.isMesh && obj.material) {
+      if (obj.material.map) {
+        obj.material.map.dispose();
+        obj.material.map = null;
+      }
+      obj.material.dispose && obj.material.dispose();
+    }
+    if (obj.geometry) obj.geometry.dispose && obj.geometry.dispose();
+  });
+
+  scene.remove(galleryGroup);
+  galleryGroup = null;
+  photoCards = [];
+  sphereParticles = null;
+}
+
+function requestLocalPhotos() {
+  return new Promise((resolve, reject) => {
+    const input = document.getElementById('photo-input');
+    if (!input) return reject(new Error("photo-input not found"));
+
+    // 重置，确保同一批照片重复选择也会触发 change
+    input.value = "";
+
+    input.onchange = () => {
+      const files = Array.from(input.files || []).filter(f => f.type.startsWith("image/"));
+      if (!files.length) return reject(new Error("no files selected"));
+
+      // 释放上次的 objectURL
+      revokeLocalPhotoURLs();
+
+      const urls = files.map(f => {
+        const u = URL.createObjectURL(f);
+        localPhotoObjectURLs.push(u);
+        return u;
+      });
+
+      resolve(urls);
+    };
+
+    // 必须由用户手势触发（你在 openGift 点击里触发，符合）
+    input.click();
+  });
+}
+
+
+        function createPhotoGallery() {
+            galleryGroup = new THREE.Group();
+            galleryGroup.position.set(0, 1.2, 0);
+            galleryGroup.visible = false;
+            scene.add(galleryGroup);
+
+            const radius = 3.2;
+            const count = config.photoList.length;
+            const loader = new THREE.TextureLoader();
+            const phi = Math.PI * (3 - Math.sqrt(5)); 
+
+            const pCount = 2500;
+            const pGeo = new THREE.BufferGeometry();
+            const pPos = new Float32Array(pCount * 3);
+            for(let i=0; i<pCount; i++) {
+                const lon = Math.random() * Math.PI * 2;
+                const lat = Math.acos(Math.random() * 2 - 1);
+                pPos[i*3] = radius * Math.sin(lat) * Math.cos(lon);
+                pPos[i*3+1] = radius * Math.sin(lat) * Math.sin(lon);
+                pPos[i*3+2] = radius * Math.cos(lat);
+            }
+            pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+            sphereParticles = new THREE.Points(pGeo, new THREE.PointsMaterial({
+                size: 0.035, color: config.theme.lavender, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending
+            }));
+            galleryGroup.add(sphereParticles);
+
+            config.photoList.forEach((path, i) => {
+                const cardG = new THREE.Group();
+                const y = 1 - (i / (count - 1)) * 2;
+                const rAtY = Math.sqrt(1 - y * y);
+                const theta = phi * i;
+                
+                let px = Math.cos(theta) * rAtY * radius;
+                let py = y * radius;
+                let pz = Math.sin(theta) * rAtY * radius;
+
+                if (px > 0.5 && py > 0.5 && pz > 0) {
+                    px -= 1.0; py -= 1.0;
+                }
+                
+                cardG.position.set(px, py, pz);
+
+                const mesh = new THREE.Mesh(
+                    new THREE.PlaneGeometry(1.6 * 0.7, 1.2 * 0.7), 
+                    new THREE.MeshBasicMaterial({ color: 0x222222, side: THREE.DoubleSide, transparent: true, opacity: 0.9 })
+                );
+                
+                loader.load(path, (tex) => {
+                    mesh.material.map = tex;
+                    mesh.material.color.set(0xffffff);
+                    mesh.material.needsUpdate = true;
+                });
+
+                const border = new THREE.LineSegments(
+                    new THREE.EdgesGeometry(new THREE.PlaneGeometry(1.15, 0.87)),
+                    new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.3 })
+                );
+                
+                cardG.add(mesh, border);
+                galleryGroup.add(cardG);
+                photoCards.push(cardG);
+            });
+        }
+
+        /**
+         * 核心交互逻辑
+         */
+        function hideCardOverlay() {
+            if (!isCardExpanded && document.getElementById('holographic-card').style.display === 'none') return;
+            const card = document.getElementById('holographic-card');
+            const btn = document.getElementById('show-card-btn');
+            
+            gsap.to(card, { 
+                opacity: 0, 
+                scale: 0.8, 
+                duration: 0.4, 
+                onComplete: () => {
+                    card.style.display = 'none';
+                    card.style.pointerEvents = 'none';
+                    isCardExpanded = false;
+                    btn.style.display = 'block';
+                }
+            });
+        }
+
+        function showCardOverlay() {
+            const card = document.getElementById('holographic-card');
+            const btn = document.getElementById('show-card-btn');
+            
+            card.style.display = 'flex';
+            card.style.pointerEvents = 'auto';
+            isCardExpanded = true;
+            btn.style.display = 'none';
+            autoRotate = false;
+
+            gsap.fromTo(card, { opacity: 0, scale: 0.5 }, { opacity: 1, scale: 1, duration: 0.4, ease: "back.out(1.2)" });
+        }
+
+        function interactTriggered() {
+            hideCardOverlay();
+            lastInteractTime = Date.now();
+            autoRotate = false;
+        }
+
+        function snapToIndex(delta) {
+            hideCardOverlay();
+            const count = config.photoList.length;
+            const step = (Math.PI * 2) / count;
+            currentPhotoIndex += delta;
+            targetRotation = currentPhotoIndex * -step;
+            gsap.to(galleryGroup.rotation, { y: targetRotation, duration: 0.8, ease: "power2.out" });
+        }
+
+        /**
+         * 升级后的手势识别：挥手旋转、捏合选中、放大缩小、握拳重置
+         */
+function dist2(a, b) {
+  const dx = a.x - b.x, dy = a.y - b.y;
+  return Math.hypot(dx, dy);
+}
+
+// 更稳的“张开/合拢”判定：指尖到掌心距离（归一化）
+function getPalmCenter(lm) {
+  // wrist(0), index_mcp(5), pinky_mcp(17) 的平均作为掌心中心
+  return {
+    x: (lm[0].x + lm[5].x + lm[17].x) / 3,
+    y: (lm[0].y + lm[5].y + lm[17].y) / 3
+  };
+}
+
+function isOpenPalmByDistance(lm) {
+  const pc = getPalmCenter(lm);
+  const palmSize = dist2(lm[0], lm[9]); // wrist(0)到middle_mcp(9)作为尺度
+  const tips = [4, 8, 12, 16, 20];
+  // 大多数指尖离掌心足够远 => 张开
+  const farCount = tips.filter(i => dist2(lm[i], pc) / palmSize > 0.85).length;
+  return farCount >= 4;
+}
+
+function isFistByDistance(lm) {
+  const pc = getPalmCenter(lm);
+  const palmSize = dist2(lm[0], lm[9]);
+  const tips = [4, 8, 12, 16, 20];
+  // 大多数指尖靠近掌心 => 合拢
+  const nearCount = tips.filter(i => dist2(lm[i], pc) / palmSize < 0.55).length;
+  return nearCount >= 4;
+}
+
+// 用食指指尖做拾取（捏住选取）
+function pickCardByIndexTip(lm) {
+  // mediapipe x,y in [0,1]
+  const x = lm[8].x;
+  const y = lm[8].y;
+  ndcHand.set(x * 2 - 1, -(y * 2 - 1));
+  raycasterHand.setFromCamera(ndcHand, camera);
+
+  // intersect photoCards（group）要用 true，命中内部 mesh
+  const hits = raycasterHand.intersectObjects(photoCards, true);
+  if (!hits || hits.length === 0) return null;
+
+  // 回溯到 photoCards 中的 group
+  let obj = hits[0].object;
+  while (obj && !photoCards.includes(obj) && obj.parent) obj = obj.parent;
+  return photoCards.includes(obj) ? obj : null;
+}
+
+function focusCard(card) {
+  if (!card) return;
+
+  // 如果切换选中，先放回旧的
+  if (selectedCard && selectedCard !== card) unfocusCard();
+
+  if (!selectedCard) {
+    selectedCard = card;
+    selectedHome = {
+      pos: card.position.clone(),
+      scale: card.scale.clone(),
+    };
+  }
+
+  // 把卡片拉到“球体前方”并放大（在 galleryGroup 的局部坐标系里操作）
+  // 目标：靠近相机视线方向的一点点（效果：前景放大）
+  const camDir = new THREE.Vector3();
+  camera.getWorldDirection(camDir);
+  const targetWorld = camera.position.clone().add(camDir.multiplyScalar(1.15));
+  const targetLocal = galleryGroup.worldToLocal(targetWorld.clone());
+
+  gsap.to(card.position, { x: targetLocal.x, y: targetLocal.y, z: targetLocal.z, duration: 0.35, ease: "power3.out" });
+  gsap.to(card.scale, { x: 1.85, y: 1.85, z: 1, duration: 0.35, ease: "power3.out" });
+
+  // 边框更亮一点
+  if (card.children && card.children[1] && card.children[1].material) {
+    gsap.to(card.children[1].material, { opacity: 0.85, duration: 0.25, overwrite: true });
+  }
+}
+
+	function unfocusCard() {
+  	   if (!selectedCard || !selectedHome) return;
+ 	 const card = selectedCard;
+
+  	gsap.to(card.position, { x: selectedHome.pos.x, y: selectedHome.pos.y, z: selectedHome.pos.z, duration: 0.45, ease: "power2.out" });
+  	gsap.to(card.scale, { x: selectedHome.scale.x, y: selectedHome.scale.y, z: selectedHome.scale.z, duration: 0.45, ease: "power2.out" });
+
+  	if (card.children && card.children[1] && card.children[1].material) {
+   	 gsap.to(card.children[1].material, { opacity: 0.3, duration: 0.25, overwrite: true });
+ 	   }
+
+  	selectedCard = null;
+  	selectedHome = null;
+	   }
+
+        /**
+ * 手势交互（仅改这一部分）：
+ * 1) 左右挥手：连续旋转星辉球（galleryGroup.rotation.y）
+ * 2) 捏合：选取照片并拉到前景放大（松开则回位）
+ * 3) 张开手掌：放大（相机拉近 + 相册微放大）
+ *    合拢手掌（握拳）：缩回“蛋糕状”（相册缩小隐藏 + 蛋糕回到1）
+ */
+function onHandResults(results) {
+if (isCardExpanded) return;
+  if (currentState !== State.CARD_PHOTOS || !results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
+    pinchHold = 0; palmHold = 0; fistHold = 0;
+    return;
+  }
+
+  // 一旦开始交互就关闭贺卡（你要求互动时关闭）
+  interactTriggered();
+
+  const lm = results.multiHandLandmarks[0];
+  const now = Date.now();
+
+  const wrist = lm[0];
+  const middleMcp = lm[9];
+  const thumbTip = lm[4];
+  const indexTip = lm[8];
+
+  // -------- 1) 连续旋转：用手的水平移动驱动旋转（更像“小红书那种跟手”）--------
+  // 用 middleMcp.x（比 wrist 更稳）计算 dx，并做一点平滑，避免抖动
+  const handX = middleMcp.x;
+  if (lastWristX !== 0) {
+    const dx = handX - lastWristX; // 正=向右移动
+    // 平滑 + 死区
+    smoothedDx = smoothedDx * 0.75 + dx * 0.25;
+    const dead = 0.0035;
+    if (Math.abs(smoothedDx) > dead && !isPinching) {
+      galleryGroup.rotation.y += smoothedDx * config.gesture.swipeSensitivity * 6.0;
+    }
+  }
+  lastWristX = handX;
+
+  // -------- 2) 捏合选取放大：pinchNorm = dist(4,8) / dist(0,9) --------
+  const d48 = dist2(thumbTip, indexTip);
+  const d09 = dist2(wrist, middleMcp);
+  const pinchNorm = d48 / Math.max(1e-6, d09);
+
+  const pinchEnter = 0.42;  // 进入捏合（更稳）
+  const pinchExit  = 0.55;  // 退出捏合
+
+  if (pinchNorm < pinchEnter) {
+    isPinching = true;
+    pinchHold++;
+
+    // 捏合保持到一定帧数才触发“选中”，避免抖动误选
+    if (pinchHold === config.gesture.kFrames) {
+      const hit = pickCardByIndexTip(lm);
+      if (hit) focusCard(hit);
+    }
+
+    // pinch 期间允许轻微拉近（可选，给“捏合=更近更大”的感觉）
+    const targetZ = THREE.MathUtils.mapLinear(
+      THREE.MathUtils.clamp(pinchNorm, 0.18, pinchEnter),
+      0.18, pinchEnter,
+      5.2, 6.6
+    );
+    camera.position.z += (targetZ - camera.position.z) * 0.18;
+
+  } else if (pinchNorm > pinchExit) {
+    // 松开捏合：取消选中并回位
+    isPinching = false;
+    pinchHold = 0;
+    unfocusCard();
+  }
+
+  // -------- 3) 张开/合拢：张开=放大；合拢=缩回蛋糕状 --------
+  const openPalm = isOpenPalmByDistance(lm);
+  const fist = isFistByDistance(lm);
+
+  // 张开手掌：放大（相机更近 + 相册轻微放大）
+  if (openPalm && !fist && !isPinching) {
+    palmHold++;
+    if (palmHold >= config.gesture.kFrames && !isPalmZoomed) {
+      isPalmZoomed = true;
+      gsap.to(camera.position, { z: 5.2, duration: 0.45, ease: "power2.out", overwrite: true });
+      gsap.to(galleryGroup.scale, { x: 1.08, y: 1.08, z: 1.08, duration: 0.45, ease: "power2.out", overwrite: true });
+      palmHold = 0;
+    }
+  } else {
+    palmHold = 0;
+  }
+
+  // 合拢手掌（握拳）：缩回最开始蛋糕状（不 reload）
+  if (fist) {
+    fistHold++;
+    if (fistHold >= Math.max(10, config.gesture.kFrames * 2)) {
+      fistHold = 0;
+
+      // 先放回选中的照片
+      unfocusCard();
+
+      // 相册缩小隐藏 + 蛋糕回到 1（“蛋糕状”）
+      autoRotate = false;
+      isPalmZoomed = false;
+
+      gsap.to(galleryGroup.scale, { x: 0.05, y: 0.05, z: 0.05, duration: 0.75, ease: "expo.inOut" });
+      gsap.to(camera.position, { z: 6.5, y: 1.8, duration: 0.75, ease: "power2.out" });
+
+      // 把蛋糕拉回（你的 cakeGroup 之前被缩到0，这里恢复）
+      if (cakeGroup) gsap.to(cakeGroup.scale, { x: 1, y: 1, z: 1, duration: 0.85, ease: "expo.out" });
+
+      // 给用户一个“缩回蛋糕”的感受：提示淡出
+      document.getElementById('gallery-hint').style.opacity = 0.0;
+    }
+  } else {
+    fistHold = 0;
+  }
+
+  // 若用户从张开态退出（不是张开了），回到默认相册大小（不影响其它逻辑）
+  if (!openPalm && isPalmZoomed && !isPinching) {
+    // 轻微回弹到默认
+    isPalmZoomed = false;
+    gsap.to(camera.position, { z: 7.0, duration: 0.45, ease: "power2.out", overwrite: true });
+    gsap.to(galleryGroup.scale, { x: 1.0, y: 1.0, z: 1.0, duration: 0.45, ease: "power2.out", overwrite: true });
+  }
+}
+
+
+        function triggerShrinkToCake() {
+            if (currentState !== State.CARD_PHOTOS) return;
+            
+            const tl = gsap.timeline({
+                onComplete: () => {
+                    if (mpCamera) mpCamera.stop();
+                    location.reload(); // 彻底重置
+                }
+            });
+
+            // 动画：星球和相片迅速缩小并消失
+            tl.to(galleryGroup.scale, { x: 0, y: 0, z: 0, duration: 0.8, ease: "power2.in" });
+            tl.to(camera.position, { z: 10, duration: 0.8 }, 0);
+            tl.to(document.body, { opacity: 0, duration: 0.5 }, 0.5);
+        }
+
+        function createCake() {
+            cakeGroup = new THREE.Group();
+            const bottom = createPointLayer(1.3, 0.9, 5000, "#6622aa"); bottom.position.y = -0.5;
+            const top = createPointLayer(0.8, 0.7, 3000, "#ffffff"); top.position.y = 0.3;
+            cakeGroup.add(bottom, top);
+            const configs = [{x:-0.38, y:0.85, s:0.85}, {x:0, y:1.05, s:1.0}, {x:0.38, y:0.85, s:0.85}];
+            configs.forEach(cfg => {
+                const candle = createCandle(cfg.s);
+                candle.position.set(cfg.x, cfg.y, 0.1);
+                cakeGroup.add(candle);
+                candles.push(candle);
+            });
+            cakeGroup.position.y = 0.6;
+            cakeGroup.scale.set(0,0,0);
+            scene.add(cakeGroup);
+        }
+
+        function createCandle(scale) {
+            const g = new THREE.Group(); g.scale.set(scale, scale, scale);
+            const bodyGeo = new THREE.CylinderGeometry(0.045, 0.05, 0.58, 16);
+            const pos = bodyGeo.attributes.position;
+            const colors = new Float32Array(pos.count * 3);
+            const cBot = new THREE.Color(config.theme.rosePink);
+            const cTop = new THREE.Color(config.theme.lavender);
+            for(let i=0; i<pos.count; i++) {
+                const mixed = cBot.clone().lerp(cTop, (pos.getY(i)+0.29)/0.58);
+                colors[i*3]=mixed.r; colors[i*3+1]=mixed.g; colors[i*3+2]=mixed.b;
+            }
+            bodyGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            g.add(new THREE.Mesh(bodyGeo, new THREE.MeshBasicMaterial({ vertexColors:true, transparent:true, opacity:0.9 })));
+            const f = createFlame(); f.position.y = 0.34;
+            g.add(f); flames.push(f);
+            return g;
+        }
+
+        function createFlame() {
+            const geo = new THREE.BufferGeometry();
+            const pos = new Float32Array(40*3); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+            const pts = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.08, color: 0xffffff, transparent: true, blending: THREE.AdditiveBlending }));
+            pts.userData = { speeds: Array.from({length:40}, ()=>Math.random()*0.015+0.01) };
+            return pts;
+        }
+
+        function createPointLayer(r, h, c, col) {
+            const geo = new THREE.BufferGeometry();
+            const pos = new Float32Array(c*3);
+            for(let i=0; i<c; i++){
+                const ang = Math.random()*Math.PI*2;
+                const dist = Math.sqrt(Math.random())*r;
+                pos[i*3]=dist*Math.cos(ang); pos[i*3+1]=(Math.random()-0.5)*h; pos[i*3+2]=dist*Math.sin(ang);
+            }
+            geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+            return new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.03, color: col, transparent: true, opacity:0.7, blending: THREE.AdditiveBlending }));
+        }
+
+        function createGiftBox() {
+  const g = new THREE.Group();
+
+  // ---------- 0) 小工具：记录目标透明度，方便 revealGift 做淡入 ----------
+  function setFadeTarget(obj) {
+    obj.traverse((o) => {
+      if (o.material) {
+        // 记录“应该淡入到多少”
+        o.userData.targetOpacity = (o.material.opacity ?? 1);
+        // 初始全透明
+        o.material.transparent = true;
+        o.material.opacity = 0;
+        // 透明物体排序更稳定
+        o.material.depthWrite = false;
+      }
+    });
+  }
+
+  // ---------- 1) 盒体（红色磨砂 + 盖子） ----------
+const boxBodyMat = new THREE.MeshStandardMaterial({
+  color: 0xC9152C,
+  roughness: 0.55,
+  metalness: 0.15,
+  transparent: true,
+  opacity: 0.95
+});
+const boxLidMat = new THREE.MeshStandardMaterial({
+  color: 0xE31D3B,
+  roughness: 0.45,
+  metalness: 0.20,
+  transparent: true,
+  opacity: 0.98
+});
+
+ 
+
+  // 盒身 + 盖子（盖子略大，稍上移）
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.78, 0.92), boxBodyMat);
+  body.position.y = -0.03;
+
+  const lid = new THREE.Mesh(new THREE.BoxGeometry(0.98, 0.28, 0.98), boxLidMat);
+  lid.position.y = 0.43;
+
+  g.add(body, lid);
+
+  // ---------- 2) 毛绒白边（圣诞感关键：顶部一圈“fuzzy trim”） ----------
+  const trimMat = new THREE.MeshBasicMaterial({
+    color: 0xFFFFFF,
+    transparent: true,
+    opacity: 0.16
+  });
+  // 用薄盒子拼一圈（避免贴图，纯几何）
+  const t = 0.06; // trim 厚度
+  const w = 0.98; // 外宽
+  const h = 0.10; // 高
+  const z = 0.98;
+
+  const trimFront = new THREE.Mesh(new THREE.BoxGeometry(w, h, t), trimMat); trimFront.position.set(0, 0.30,  z/2);
+  const trimBack  = new THREE.Mesh(new THREE.BoxGeometry(w, h, t), trimMat); trimBack.position.set(0, 0.30, -z/2);
+  const trimLeft  = new THREE.Mesh(new THREE.BoxGeometry(t, h, z), trimMat); trimLeft.position.set(-w/2, 0.30, 0);
+  const trimRight = new THREE.Mesh(new THREE.BoxGeometry(t, h, z), trimMat); trimRight.position.set( w/2, 0.30, 0);
+  g.add(trimFront, trimBack, trimLeft, trimRight);
+
+  // ---------- 3) 金色丝带（十字腰封 + 顶部横带） ----------
+  const ribbonMat = new THREE.MeshBasicMaterial({
+    color: 0xF7D36B,       // 金色
+    transparent: true,
+    opacity: 0.32
+  });
+
+  // 竖带（贯穿盒身+盖子）
+  const ribbonV = new THREE.Mesh(new THREE.BoxGeometry(0.14, 1.05, 0.95), ribbonMat);
+  ribbonV.position.y = 0.12;
+
+  // 横带（贯穿盒身+盖子）
+  const ribbonH = new THREE.Mesh(new THREE.BoxGeometry(0.95, 1.05, 0.14), ribbonMat);
+  ribbonH.position.y = 0.12;
+
+  // 顶部再加一条横带（更像“盖子上的丝带”）
+  const ribbonTop = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.08, 0.16), ribbonMat);
+  ribbonTop.position.set(0, 0.57, 0);
+
+  g.add(ribbonV, ribbonH, ribbonTop);
+
+  // ---------- 4) 立体蝴蝶结（四个环 + 两条尾巴 + 结点） ----------
+  const bowMat = new THREE.MeshBasicMaterial({
+    color: 0xF7D36B,
+    transparent: true,
+    opacity: 0.42
+  });
+
+  const ringGeo = new THREE.TorusGeometry(0.14, 0.045, 12, 28);
+  const bow1 = new THREE.Mesh(ringGeo, bowMat.clone());
+  const bow2 = new THREE.Mesh(ringGeo, bowMat.clone());
+  const bow3 = new THREE.Mesh(ringGeo, bowMat.clone());
+  const bow4 = new THREE.Mesh(ringGeo, bowMat.clone());
+
+  bow1.rotation.set(Math.PI/2, 0, 0);
+  bow2.rotation.set(Math.PI/2, Math.PI/2, 0);
+  bow3.rotation.set(Math.PI/2, Math.PI/4, 0);
+  bow4.rotation.set(Math.PI/2, -Math.PI/4, 0);
+
+  // ✅ 先创建 knot / tails，再改位置（你现在就是少了这一步）
+  const knot = new THREE.Mesh(new THREE.SphereGeometry(0.07, 16, 16), bowMat.clone());
+
+  const tailGeo = new THREE.BoxGeometry(0.10, 0.22, 0.04);
+  const tailL = new THREE.Mesh(tailGeo, bowMat.clone());
+  const tailR = new THREE.Mesh(tailGeo, bowMat.clone());
+
+  // ✅ 再统一设置位置
+  const bowY = 0.66;
+  const bowZ = 0.62;
+
+  bow1.position.set(0, bowY, bowZ);
+  bow2.position.set(0, bowY, bowZ);
+  bow3.position.set(0, bowY, bowZ);
+  bow4.position.set(0, bowY, bowZ);
+
+  knot.position.set(0, bowY, bowZ + 0.03);
+
+  tailL.position.set(-0.08, 0.52, 0.60);
+  tailR.position.set( 0.08, 0.52, 0.60);
+  tailL.rotation.set(0.2, 0.2,  0.25);
+  tailR.rotation.set(0.2,-0.2, -0.25);
+
+  [bow1,bow2,bow3,bow4,knot,tailL,tailR].forEach((m,i)=>{ m.renderOrder = 20 + i; });
+
+  g.add(bow1, bow2, bow3, bow4, knot, tailL, tailR);
+
+
+  // ---------- 5) 星辉粒子（少量、围绕盒子，不要“雪噪点”） ----------
+  const pCount = 220;
+  const pGeo = new THREE.BufferGeometry();
+  const pPos = new Float32Array(pCount * 3);
+  for (let i = 0; i < pCount; i++) {
+    // 在盒子周围一个“椭球壳”上采样（更像光晕）
+    const u = Math.random() * Math.PI * 2;
+    const v = Math.acos(Math.random() * 2 - 1);
+    const r = 0.75 + Math.random() * 0.20;
+    const x = r * Math.sin(v) * Math.cos(u);
+    const y = r * Math.sin(v) * Math.sin(u) * 0.85 + 0.10;
+    const z2 = r * Math.cos(v);
+    pPos[i*3] = x;
+    pPos[i*3+1] = y;
+    pPos[i*3+2] = z2;
+  }
+  pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+
+  const sparkle = new THREE.Points(
+    pGeo,
+    new THREE.PointsMaterial({
+      size: 0.02,
+      color: 0xFFFFFF,
+      transparent: true,
+      opacity: 0.22,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    })
+  );
+  sparkle.renderOrder = 5;
+  g.add(sparkle);
+
+  // ---------- 6) 核心星辉（保持你原来的逻辑） ----------
+  const core = new THREE.Mesh(
+    new THREE.SphereGeometry(0.18, 16, 16),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.0 })
+  );
+  g.add(core);
+  g.userData.core = core;
+
+  // ---------- 7) 透明碰撞盒（点击命中更稳：你现有点击逻辑需要） ----------
+  const collider = new THREE.Mesh(
+    new THREE.BoxGeometry(1.20, 1.10, 1.20),
+    new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.0, depthWrite: false })
+  );
+  collider.name = "giftCollider";
+  collider.renderOrder = 100;
+  g.add(collider);
+  g.userData.collider = collider;
+
+  // ---------- 8) 作为 giftBox 使用 ----------
+  giftBox = g;
+  giftBox.position.set(0, 1.2, 0.5);
+  giftBox.scale.set(0.95, 0.95, 0.95);
+
+  // 初始不可见（配合 revealGift 淡入）
+  setFadeTarget(giftBox);
+ 
+  scene.add(giftBox);
+}
+
+
+        function initAudio() {
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+                    const source = audioContext.createMediaStreamSource(stream);
+                    analyser = audioContext.createAnalyser(); analyser.fftSize = 256;
+                    source.connect(analyser); dataArray = new Uint8Array(analyser.frequencyBinCount);
+                }).catch(() => document.getElementById('skip-btn').style.display = 'block');
+            } catch(e) {}
+        }
+
+        function initInteractionListeners() {
+            const container = document.getElementById('canvas-container');
+            container.addEventListener('click', (e) => {
+                if(currentState === State.GIFT) {
+                    const mouse = new THREE.Vector2((e.clientX/window.innerWidth)*2-1, -(e.clientY/window.innerHeight)*2+1);
+                    const raycaster = new THREE.Raycaster();
+                    raycaster.setFromCamera(mouse, camera);
+                    const target = (giftBox && giftBox.userData && giftBox.userData.collider) ? giftBox.userData.collider : giftBox;
+if (target && raycaster.intersectObject(target, true).length > 0) openGift();
+                }
+            });
+            container.addEventListener('mousedown', (e) => { 
+                if(currentState === State.CARD_PHOTOS) { 
+                    hideCardOverlay();
+                    isDragging = true; startX = e.clientX; interactTriggered(); 
+                } 
+            });
+            window.addEventListener('mousemove', (e) => {
+                if(isDragging && currentState === State.CARD_PHOTOS) {
+                    const deltaX = e.clientX - startX;
+                    galleryGroup.rotation.y += deltaX * 0.005;
+                    startX = e.clientX;
+                }
+            });
+            window.addEventListener('mouseup', () => { if(isDragging) { isDragging = false; snapToIndex(0); } });
+            window.addEventListener('keydown', (e) => {
+                if(currentState === State.CARD_PHOTOS) {
+                    if(e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                        interactTriggered();
+                        if(e.key === 'ArrowRight') snapToIndex(1); else snapToIndex(-1);
+                    }
+                }
+            });
+            window.addEventListener('wheel', (e) => {
+                if(currentState === State.CARD_PHOTOS) { 
+                    interactTriggered(); 
+                    camera.position.z = Math.min(Math.max(camera.position.z + e.deltaY * 0.005, 5), 12); 
+                }
+            });
+        }
+
+        async function startSequence() {
+            initThree();
+            document.getElementById('intro-screen').style.display = 'none';
+            setState(State.COUNTDOWN);
+            const cd = document.getElementById('countdown');
+            cd.style.display = 'block';
+            for(let i=3; i>0; i--) {
+                cd.innerText = i;
+                gsap.fromTo(cd, {scale: 0.3, opacity: 0}, {scale: 1.1, opacity: 1, duration: 0.7, ease: "back.out"});
+                await new Promise(r => setTimeout(r, 1000));
+            }
+            cd.style.display = 'none';
+            revealCake();
+        }
+
+        function revealCake() {
+            setState(State.CAKE_REVEAL);
+            createCake(); createGiftBox(); createPhotoGallery();
+            document.getElementById('title').style.opacity = 1;
+            gsap.to(cakeGroup.scale, { x: 1, y: 1, z: 1, duration: 2.5, ease: "expo.out" });
+            setTimeout(() => { initAudio(); startBlowStage(); }, 2600);
+        }
+
+        function startBlowStage() {
+            setState(State.BLOW);
+            document.getElementById('blow-meter').style.display = 'block';
+            document.getElementById('status-msg').innerText = "对着麦克风深呼吸，一口气吹灭它们";
+            setTimeout(() => { if(currentState === State.BLOW) document.getElementById('skip-btn').style.display = 'block'; }, 9000);
+        }
+
+        function finishBlowing() {
+            if(currentState !== State.BLOW) return;
+            setState(State.EXTINGUISH);
+            document.getElementById('interaction-ui').style.display = 'none';
+            const tl = gsap.timeline();
+            tl.to(flames[1].scale, { x: 0, y: 0, z: 0, duration: 0.6 });
+            tl.to([flames[0].scale, flames[2].scale], { x: 0, y: 0, z: 0, duration: 0.8 }, "-=0.2");
+            setTimeout(revealGift, 1500);
+        }
+
+        function revealGift() {
+  setState(State.GIFT);
+
+ giftBox.traverse(obj => {
+   if (obj.material) {
+     const t = (obj === giftBox.userData.core) ? 0.8 : (obj.userData.targetOpacity ?? 0.85);
+     gsap.to(obj.material, { opacity: t, duration: 1 });
+   }
+});
+
+  gsap.to(giftBox.position, { y: 1.5, repeat: -1, yoyo: true, duration: 2, ease: "sine.inOut" });
+
+  document.getElementById('status-msg').style.display = 'block';
+  document.getElementById('status-msg').innerText = "星光凝结成了礼物，点击打开它";
+}
+
+async function openGift() {
+  if(currentState !== State.GIFT) return;
+  setState(State.CARD_PHOTOS);
+
+  // 先让对方选照片（不选就不进入相册）
+  let urls = [];
+  try {
+    document.getElementById('status-msg').style.display = 'block';
+    document.getElementById('status-msg').innerText = "请选择要展示的照片（仅本地显示，不会上传）";
+
+    urls = await requestLocalPhotos();
+  } catch (e) {
+    // 用户取消选择：回到礼物阶段，不继续
+    setState(State.GIFT);
+    document.getElementById('status-msg').innerText = "未选择照片，可再次点击礼物打开";
+    return;
+  }
+
+  // 把本地 URLs 塞回配置，复用你原来的建相册逻辑
+  config.photoList = urls;
+
+  // 如果之前创建过相册，先清掉重建
+  disposeGallery();
+  createPhotoGallery();
+
+  // 下面保持你原逻辑
+  burstStars(giftBox.position);
+  scene.remove(giftBox);
+  gsap.to(cakeGroup.scale, { x:0, y:0, z:0, duration: 1 });
+
+  galleryGroup.visible = true;
+  galleryGroup.scale.set(0.1, 0.1, 0.1);
+  gsap.to(galleryGroup.scale, { x:1, y:1, z:1, duration: 1.5, ease: "expo.out" });
+  gsap.to(camera.position, { z: 7.0, y: 1.5, duration: 2 });
+
+  showCardOverlay();
+  document.getElementById('gallery-hint').style.opacity = 1;
+  document.getElementById('status-msg').innerText = ""; // 清提示
+  startHands();
+}
+
+
+        function startHands() {
+            const videoElement = document.getElementById('input-video');
+            mpHands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
+            mpHands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+            mpHands.onResults(onHandResults);
+            mpCamera = new Camera(videoElement, { onFrame: async () => { await mpHands.send({image: videoElement}); }, width: 640, height: 480 });
+            mpCamera.start().catch(() => { document.getElementById('gallery-hint').innerText = "手势不可用，已启用鼠标控制"; });
+        }
+
+   function restartPage() { 
+  if (mpCamera) mpCamera.stop(); 
+  revokeLocalPhotoURLs();
+  location.reload(); 
+}
+
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const time = clock.getElapsedTime();
+            if(starField) starField.rotation.y += 0.0005;
+
+            if(galleryGroup && galleryGroup.visible) {
+                if(autoRotate && !isCardExpanded) galleryGroup.rotation.y += 0.002;
+                else if(Date.now() - lastInteractTime > 5000 && !isCardExpanded) autoRotate = true;
+
+                sphereParticles.rotation.y += 0.001;
+
+                photoCards.forEach((card) => {
+  card.lookAt(camera.position);
+
+  // 被选中的卡片由 focusCard() 控制，不在这里动它
+  if (selectedCard === card) return;
+
+  // 固定尺寸：不要动 scale（或者强制设回 1）
+  card.scale.set(1, 1, 1);
+
+  // 可选：只做淡入淡出，让远处更轻
+  const worldPos = new THREE.Vector3();
+  card.getWorldPosition(worldPos);
+  const dist = worldPos.distanceTo(camera.position);
+
+  const a = THREE.MathUtils.clamp(1.0 - (dist - 4.5) / 5.5, 0.35, 1.0);
+  card.children[0].material.opacity = a;
+  card.children[1].material.opacity = 0.15 + a * 0.35;
+});
+            }
+
+            flames.forEach(f => {
+                const pos = f.geometry.attributes.position.array;
+                for(let i=0; i<40; i++){ pos[i*3+1] += f.userData.speeds[i]; if(pos[i*3+1] > 0.35) pos[i*3+1] = 0; }
+                f.geometry.attributes.position.needsUpdate = true;
+            });
+
+            if(currentState === State.BLOW) updateBlowDetection();
+            if(renderer && scene && camera) renderer.render(scene, camera);
+        }
+
+        function updateBlowDetection() {
+            if(!analyser) return;
+            analyser.getByteFrequencyData(dataArray);
+            let sum = 0; for(let i=0; i<8; i++) sum += dataArray[i];
+            let avg = sum / 8 / 255;
+            if(avg > config.blowThreshold) {
+                blowProgress += 0.03;
+                flames.forEach(f => f.scale.set(1+avg*2.5, 1+avg*2.5, 1+avg*2.5));
+            } else { blowProgress = Math.max(0, blowProgress - 0.01); }
+            document.getElementById('blow-fill').style.width = (blowProgress*100/config.blowHoldSeconds) + "%";
+            if(blowProgress >= config.blowHoldSeconds) finishBlowing();
+        }
+
+        function burstStars(pos) {
+            const count = 150;
+            const geo = new THREE.BufferGeometry();
+            const posArr = new Float32Array(count*3);
+            for(let i=0; i<count*3; i++) posArr[i] = 0;
+            geo.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
+            const mat = new THREE.PointsMaterial({ size: 0.08, color: 0xffffff, blending: THREE.AdditiveBlending, transparent:true });
+            const pts = new THREE.Points(geo, mat);
+            pts.position.copy(pos); scene.add(pts);
+            const vels = Array.from({length:count}, ()=>new THREE.Vector3((Math.random()-0.5)*0.3, (Math.random()-0.5)*0.3, (Math.random()-0.5)*0.3));
+            gsap.to({}, { duration: 1.5, onUpdate: () => {
+                for(let i=0; i<count; i++){ posArr[i*3]+=vels[i].x; posArr[i*3+1]+=vels[i].y; posArr[i*3+2]+=vels[i].z; }
+                pts.geometry.attributes.position.needsUpdate = true; pts.material.opacity -= 0.015;
+            }, onComplete: () => scene.remove(pts) });
+        }
+
+        function onWindowResize() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); }
+        function setState(s) { currentState = s; }
+        function forceBlowDone() { gsap.to({v:blowProgress}, { v:config.blowHoldSeconds, duration:1.5, onUpdate:function(){ document.getElementById('blow-fill').style.width=(this.targets()[0].v*100/config.blowHoldSeconds)+"%"; }, onComplete:finishBlowing }); }
+
+function fillCardText() {
+  // To
+  const toEl = document.getElementById('card-to');
+  if (toEl) toEl.textContent = `To: ${config.recipientName}`;
+
+  // Wish
+  const wishEl = document.getElementById('card-wish');
+  if (wishEl) {
+    wishEl.innerHTML = config.messageLines.map(line => `<p style="margin:10px 0;">${line}</p>`).join('');
+  }
+
+  // Date
+  const dateEl = document.getElementById('current-date');
+  if (dateEl) dateEl.textContent = new Date().toLocaleDateString('zh-CN');
+}
+
+     window.onload = () => { 
+  initThree(); 
+  fillCardText();   // ✅ 加这一句
+  animate(); 
+};
+    </script>
+</body>
+</html>
