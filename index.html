@@ -255,10 +255,9 @@ if (input !== ACCESS_CODE) {
 <body>
 
     <!-- 添加背景音乐 -->
-   <audio autoplay loop>
-    <source src="happy_birthday.mp3" type="audio/mp3">
-    您的浏览器不支持音频元素。
-   </audio>
+   <audio id="bgm" loop preload="auto">
+  <source src="happy_birthday.mp3" type="audio/mpeg">
+</audio>
 
     <div id="canvas-container"></div>
     <video id="input-video" playsinline></video>
@@ -1113,6 +1112,12 @@ if (target && raycaster.intersectObject(target, true).length > 0) openGift();
         }
 
         async function startSequence() {
+		const bgm = document.getElementById('bgm');
+ 		 if (bgm) {
+    		bgm.volume = 0.6;
+    		bgm.play().catch(()=>{});
+  		}
+
             initThree();
             document.getElementById('intro-screen').style.display = 'none';
             setState(State.COUNTDOWN);
