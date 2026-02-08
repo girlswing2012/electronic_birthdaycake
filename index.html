@@ -254,6 +254,12 @@ if (input !== ACCESS_CODE) {
 </head>
 <body>
 
+    <!-- 添加背景音乐 -->
+   <audio autoplay loop>
+    <source src="happy_birthday.mp3" type="audio/mp3">
+    您的浏览器不支持音频元素。
+   </audio>
+
     <div id="canvas-container"></div>
     <video id="input-video" playsinline></video>
 
@@ -285,7 +291,7 @@ if (input !== ACCESS_CODE) {
 
     <button id="show-card-btn" class="interactive" onclick="showCardOverlay()">查看贺卡 ✨</button>
 
-<input id="photo-input" type="file" accept="image/*" multiple style="display:none">
+    <input id="photo-input" type="file" accept="image/*" multiple style="display:none">
 
     <script>
         const config = {
