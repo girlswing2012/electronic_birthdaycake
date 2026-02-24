@@ -278,6 +278,12 @@ if (input !== ACCESS_CODE) {
             <button id="skip-btn" class="btn-magic interactive" style="display:none; font-size: 0.85rem; margin-top: 40px;" onclick="forceBlowDone()">✨ 让星光替你完成这一刻</button>
         </div>
         <div id="gallery-hint">挥手旋转星球，捏合放大照片</div>
+        <button id="enable-hands-btn"
+        class="btn-magic interactive"
+        style="display:none; font-size:0.9rem; margin-top:12px;"
+        onclick="enableHandsFromUserGesture()">
+  📷 启用手势互动（需要相机权限）
+</button>
     </div>
 
     <div id="holographic-card" class="interactive">
@@ -1211,17 +1217,41 @@ async function openGift() {
   showCardOverlay();
   document.getElementById('gallery-hint').style.opacity = 1;
   document.getElementById('status-msg').innerText = ""; // 清提示
+    // 移动端需要“第二次明确点击”才能稳定弹出相机权限
+  const btn = document.getElementById('enable-hands-btn');
+  if (btn) btn.style.display = 'inline-block';
+
+  const hint = document.getElementById('gallery-hint');
+  if (hint) hint.innerText = "点击下方按钮启用手势互动；挥手旋转星球，捏合缩放照片";
+}
+   
+  let handsStarted = false;
+
+function enableHandsFromUserGesture() {
+  // 必须由用户点击触发（移动端相机权限更稳）
   startHands();
+  const btn = document.getElementById('enable-hands-btn');
+  if (btn) btn.style.display = 'none';
 }
 
-
         function startHands() {
+         if (handsStarted) return;
+            handsStarted = true;
+
             const videoElement = document.getElementById('input-video');
             mpHands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
             mpHands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
             mpHands.onResults(onHandResults);
             mpCamera = new Camera(videoElement, { onFrame: async () => { await mpHands.send({image: videoElement}); }, width: 640, height: 480 });
-            mpCamera.start().catch(() => { document.getElementById('gallery-hint').innerText = "手势不可用，已启用鼠标控制"; });
+            mpCamera.start().catch((err) => {
+  console.log("mpCamera start failed:", err);
+  const hint = document.getElementById('gallery-hint');
+  if (hint) {
+    hint.style.opacity = 1;
+    hint.innerText = "手势不可用：相机权限未开启或被浏览器拦截。请点击“启用手势互动”并允许相机权限。";
+  }
+  handsStarted = false; // 允许用户再次点击按钮重试
+});
         }
 
    function restartPage() { 
